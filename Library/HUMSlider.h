@@ -8,6 +8,7 @@
 
 #import <UIKit/UIKit.h>
 
+
 typedef NS_ENUM(NSUInteger, HUMSliderSide) {
     HUMSliderSideLeft,
     HUMSliderSideRight
@@ -23,12 +24,15 @@ typedef NS_ENUM(NSUInteger, HUMSliderSide) {
 @interface HUMSlider : UISlider
 
 #pragma mark - Ticks
-
+@property(nonatomic,strong) UISlider *parasitic;
+-(void)setStep:(NSUInteger)step;
+-(NSInteger)getStep;
 ///The color of the ticks you wish to pop up. Defaults to dark gray.
 @property (nonatomic) UIColor *tickColor;
 
 ///How many sections of ticks should be created. NOTE: Needs to be an odd number or math falls apart. Defaults to 9.
-@property (nonatomic) NSUInteger sectionCount;
+
+-(void)setSectionCount:(NSUInteger)largeSpaceCount small:(NSUInteger)smallSpaceCount;
 
 ///How many points the tick popping should be adjusted for a custom thumbnail image to account for any space at the top (for example, to balance out a custom shadow).
 @property (nonatomic) CGFloat pointAdjustmentForCustomThumb;

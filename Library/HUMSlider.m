@@ -7,6 +7,7 @@
 //
 
 #import "HUMSlider.h"
+//#import "IIDelayedAction.h"
 
 // Animation Durations
 static NSTimeInterval const HUMTickAlphaDuration = 0.20;
@@ -23,7 +24,9 @@ static CGFloat const HUMTickHeight = 6;
 static CGFloat const HUMTickWidth = 1;
 
 @interface HUMSlider ()
-@property (nonatomic) NSArray *tickViews;
+{
+    BOOL _thumbOn;
+}
 @property (nonatomic) NSArray *allTickBottomConstraints;
 @property (nonatomic) NSArray *leftTickRightConstraints;
 @property (nonatomic) NSArray *rightTickLeftConstraints;
@@ -40,6 +43,10 @@ static CGFloat const HUMTickWidth = 1;
 @property (nonatomic) UIImageView *rightDesaturatedImageView;
 @property (nonatomic) UIColor *rightDesaturatedColor;
 
+@property (nonatomic) NSUInteger largeSpaceCount;
+@property (nonatomic) NSUInteger smallSpaceCount;
+@property (nonatomic) NSUInteger sectionCount;
+@property (nonatomic) NSArray *tickViews;
 @end
 
 @implementation HUMSlider
@@ -115,7 +122,15 @@ static CGFloat const HUMTickWidth = 1;
     for (NSInteger i = 0; i < self.sectionCount; i++) {
         UIView *tick = [[UIView alloc] init];
         tick.backgroundColor = self.tickColor;
+        //4 5
+        //
+        if (i < self.largeSpaceCount * 2 - 1 ) {
+            if (i%2 != 0) {
+                tick.hidden = YES;
+            }
+        }
         tick.alpha = 0;
+        
         tick.translatesAutoresizingMaskIntoConstraints = NO;
         [self addSubview:tick];
         [self sendSubviewToBack:tick];
@@ -135,8 +150,8 @@ static CGFloat const HUMTickWidth = 1;
     NSMutableArray *rights = [NSMutableArray array];
     
     UIView *middleTick = self.tickViews[self.middleTickIndex];
-    [self pinTickWidthAndHeight:middleTick];
-    NSLayoutConstraint *midBottom = [self pinTickBottom:middleTick];
+    [self pinTickWidthAndHeight:middleTick];//奇数的最中间的tick的宽高
+    NSLayoutConstraint *midBottom = [self pinTickBottom:middleTick];//奇数的最中间的tick的底部距离self底部的距离为tickOutPosition
     [bottoms addObject:midBottom];
     
     // Pin the middle tick to the middle of the slider.
@@ -147,7 +162,24 @@ static CGFloat const HUMTickWidth = 1;
                                                      attribute:NSLayoutAttributeCenterX
                                                     multiplier:1
                                                       constant:0]];
-    
+    /*
+     sectionCount为5 即5个tick
+     0 1 2 3 4
+     middleTickIndex = 2
+     
+     i = 0; i < 2; i ++
+     {
+     紧挨着middle的左右两个tick
+     previousLowest = 2
+     previousHightest = 2
+     
+     次挨着middle的左右两个tick
+     nextToLeft = 1
+     nextToRight = 3
+     
+     设置次挨着的左右两个tick的宽高后，设置bottom并且按照tick的顺序添加到bottoms数组中
+     }
+     */
     for (NSInteger i = 0; i < self.middleTickIndex; i++) {
         NSInteger previousLowest = self.middleTickIndex - i;
         NSInteger previousHighest = self.middleTickIndex + i;
@@ -171,6 +203,7 @@ static CGFloat const HUMTickWidth = 1;
         [bottoms addObject:rightBottom];
         
         // Pin the right of the next leftwards tick to the previous leftwards tick
+        //1的右边与2的左边相差-(self.segmentWidth - HUMTickWidth)
         NSLayoutConstraint *left = [NSLayoutConstraint constraintWithItem:nextToLeft
                                                                 attribute:NSLayoutAttributeRight
                                                                 relatedBy:NSLayoutRelationEqual
@@ -420,7 +453,12 @@ static CGFloat const HUMTickWidth = 1;
     [super setValue:value];
     [self sliderAdjusted];
 }
-
+-(void)setSectionCount:(NSUInteger)largeSpaceCount small:(NSUInteger)smallSpaceCount{
+    NSAssert(smallSpaceCount % 2 == 0, @"Must use an even number of sections!");
+    _largeSpaceCount = largeSpaceCount;
+    _smallSpaceCount = smallSpaceCount;
+    [self setSectionCount:_largeSpaceCount * 2 - 1 + _smallSpaceCount];
+}
 - (void)setSectionCount:(NSUInteger)sectionCount
 {
     // Warn the developer that they need to use an odd number of sections.
@@ -430,6 +468,10 @@ static CGFloat const HUMTickWidth = 1;
     
     [self nukeOldTicks];
     [self setupTicks];
+    
+    [self animateAllTicksIn:YES];//动画出现
+    [self popTickIfNeededFromTouch:nil];//根据点击位置pop
+    
 }
 
 - (void)setMinimumValueImage:(UIImage *)minimumValueImage
@@ -478,7 +520,7 @@ static CGFloat const HUMTickWidth = 1;
     [self setDesaturatedColor:desaturatedColor forSide:HUMSliderSideRight];
 }
 
-#pragma mark - Setters for colors on different sides. 
+#pragma mark - Setters for colors on different sides.
 
 - (void)setSaturatedColor:(UIColor *)saturatedColor forSide:(HUMSliderSide)side
 {
@@ -516,7 +558,7 @@ static CGFloat const HUMTickWidth = 1;
             self.rightDesaturatedColor = desaturatedColor;
             break;
     }
-
+    
     [self imageViewForSide:side saturated:NO].tintColor = desaturatedColor;
 }
 
@@ -564,19 +606,20 @@ static CGFloat const HUMTickWidth = 1;
 
 #pragma mark - UIControl touch event tracking
 #pragma mark Animate In
-
+//UISlider与UIControl不太一样，只有触摸thumb时，才会调用continue...、end...
 - (BOOL)beginTrackingWithTouch:(UITouch *)touch withEvent:(UIEvent *)event
 {
     // Update the width
     [self updateLeftTickConstraintsIfNeeded];
-    [self animateAllTicksIn:YES];
-    [self popTickIfNeededFromTouch:touch];
+    [self animateAllTicksIn:YES];//动画出现
+    [self popTickIfNeededFromTouch:touch];//根据点击位置pop
     
     return [super beginTrackingWithTouch:touch withEvent:event];
 }
 
 - (void)animateTickIfNeededAtIndex:(NSInteger)tickIndex forTouchX:(CGFloat)touchX
 {
+    //根据thumb的中心坐标touchX，设置每个tick的高度
     UIView *tick = self.tickViews[tickIndex];
     CGFloat startSegmentX = (tickIndex * self.segmentWidth) + self.trackXOrigin;
     CGFloat endSegmentX = startSegmentX + self.segmentWidth;
@@ -611,6 +654,7 @@ static CGFloat const HUMTickWidth = 1;
     CGRect thumbRect = [self thumbRectForBounds:self.bounds
                                       trackRect:trackRect
                                           value:self.value];
+    //在拖动thumb时，sliderLoc是thumb的中心坐标
     CGFloat sliderLoc = CGRectGetMidX(thumbRect);
     
     // Animate tick based on the thumb location
@@ -628,11 +672,109 @@ static CGFloat const HUMTickWidth = 1;
     [super cancelTrackingWithEvent:event];
 }
 
+-(void)setStep:(NSUInteger)step{//0 1 ~ 13
+    //step即非hidden的tick序号
+    /*
+     step = 3
+     large = 4
+     step  0   1   2   3   4   5
+     index 0 1 2 3 4 5 6   7   8
+     */
+    NSUInteger tickIndex = NSNotFound;
+    if (step <= self.largeSpaceCount - 1) {
+        tickIndex = step * 2;
+    }else{
+        /*
+         step = 5
+         large = 4
+         index = ?
+         */
+        tickIndex = (self.largeSpaceCount - 1) *2 + (step - self.largeSpaceCount + 1);
+    }
+    CGFloat tickCenter = [[self.tickViews objectAtIndex:tickIndex] center].x;
+    CGFloat value = [self valueForX:tickCenter];
+    [self setValue:value animated:NO];//duration depends on distance. does not send action
+    [self.parasitic setValue:[self stepValueForCurrentValue] animated:YES];
+    [self popTickIfNeededFromTouch:nil];
+}
+//求step
+-(NSInteger)getStep{
+    //value转x
+    CGRect thumbRect = [self thumbRectForBounds:self.bounds trackRect:[self trackRectForBounds:self.bounds] value:self.value];
+    CGFloat valueCenter = CGRectGetMidX(thumbRect);
+    //x找到停靠x
+    __block CGFloat nearest = NSIntegerMax;
+    __block CGFloat stepX = 0;
+    __block NSInteger stepIndex = 0;
+    __block NSInteger nowStep = 0;
+    [self.tickViews enumerateObjectsUsingBlock:^(id  _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
+        
+        if (!((UIView *)obj).hidden) {
+            
+            
+            CGFloat tickCenter = [obj center].x;
+            CGFloat distance = fabs(valueCenter - tickCenter);
+            if (distance < nearest) {
+                nearest = distance;
+                stepX = tickCenter;
+                nowStep = stepIndex;
+            }
+            stepIndex++;//第stepIndex个不hidden的tick
+        }
+        
+    }];
+    return nowStep;
+}
+//根据value获得X，根据X获得最近的step的X，根据step的x找到对应的value，然后重新设置value
+-(CGFloat)stepValueForCurrentValue{
+    //value转x
+    CGRect thumbRect = [self thumbRectForBounds:self.bounds trackRect:[self trackRectForBounds:self.bounds] value:self.value];
+    CGFloat valueCenter = CGRectGetMidX(thumbRect);
+    //x找到停靠x
+    __block CGFloat nearest = NSIntegerMax;
+    __block CGFloat stepX = 0;
+    [self.tickViews enumerateObjectsUsingBlock:^(id  _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
+        if (!((UIView *)obj).hidden) {
+            CGFloat tickCenter = [obj center].x;
+            CGFloat distance = fabs(valueCenter - tickCenter);
+            if (distance < nearest) {
+                nearest = distance;
+                stepX = tickCenter;
+            }
+        }
+        
+    }];
+    //停靠x找到value
+    CGFloat stepValue = [self valueForX:stepX];
+    //    NSLog(@"stepX %f  计算的value %f",stepX,stepValue);
+    return stepValue;
+}
+-(CGFloat)valueForX:(CGFloat)x{
+    CGFloat xforMinValue = CGRectGetMidX([self thumbRectForBounds:self.bounds trackRect:[self trackRectForBounds:self.bounds] value:self.minimumValue]);
+    
+    CGFloat xforMaxValue = CGRectGetMidX([self thumbRectForBounds:self.bounds trackRect:[self trackRectForBounds:self.bounds] value:self.maximumValue]);
+    
+    return self.maximumValue * ((x - xforMinValue) / (xforMaxValue - xforMinValue));
+}
 - (void)endTrackingWithTouch:(UITouch *)touch withEvent:(UIEvent *)event
 {
     [self returnPosition];
     
     [super endTrackingWithTouch:touch withEvent:event];
+    
+    //    只需要改animateBlock中duration，即可改变popUpviews的移动速度
+    
+    [self setValue:[self stepValueForCurrentValue] animated:NO];//duration depends on distance. does not send action
+    [self.parasitic setValue:[self stepValueForCurrentValue] animated:YES];//AS的yes才会动画调整arrowOffset
+    //    [self.parasitic setSprintValue:[self stepValueForCurrentValue]];
+    [self popTickIfNeededFromTouch:nil];
+    //    [IIDelayedAction delayedAction:^{
+    //        NSLog(@"执行");
+    //
+    //    } withDelay:1.];
+    //thumb停靠
+    //停靠后要pop
+    
 }
 
 - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event
@@ -644,7 +786,7 @@ static CGFloat const HUMTickWidth = 1;
 
 - (void)returnPosition
 {
-    [self animateAllTicksIn:NO];
+    //    [self animateAllTicksIn:NO];
 }
 
 #pragma mark - Tick Animation
