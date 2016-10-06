@@ -32,6 +32,7 @@ typedef NS_ENUM(NSUInteger, HUMSliderSide) {
 
 ///How many sections of ticks should be created. NOTE: Needs to be an odd number or math falls apart. Defaults to 9.
 
+// largeSpaceCount:2 smallSpaceCount:4 means: |     |  |  |  |  |
 -(void)setSectionCount:(NSUInteger)largeSpaceCount small:(NSUInteger)smallSpaceCount;
 
 ///How many points the tick popping should be adjusted for a custom thumbnail image to account for any space at the top (for example, to balance out a custom shadow).

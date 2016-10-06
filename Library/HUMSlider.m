@@ -7,7 +7,6 @@
 //
 
 #import "HUMSlider.h"
-//#import "IIDelayedAction.h"
 
 // Animation Durations
 static NSTimeInterval const HUMTickAlphaDuration = 0.20;
@@ -670,6 +669,13 @@ static CGFloat const HUMTickWidth = 1;
     [self returnPosition];
     
     [super cancelTrackingWithEvent:event];
+    
+    //只需要改animateBlock中duration，即可改变popUpviews的移动速度
+    
+    [self setValue:[self stepValueForCurrentValue] animated:NO];//duration depends on distance. does not send action
+    [self.parasitic setValue:[self stepValueForCurrentValue] animated:YES];//AS的yes才会动画调整arrowOffset
+    [self popTickIfNeededFromTouch:nil];
+
 }
 
 -(void)setStep:(NSUInteger)step{//0 1 ~ 13
@@ -746,7 +752,6 @@ static CGFloat const HUMTickWidth = 1;
     }];
     //停靠x找到value
     CGFloat stepValue = [self valueForX:stepX];
-    //    NSLog(@"stepX %f  计算的value %f",stepX,stepValue);
     return stepValue;
 }
 -(CGFloat)valueForX:(CGFloat)x{
@@ -762,19 +767,11 @@ static CGFloat const HUMTickWidth = 1;
     
     [super endTrackingWithTouch:touch withEvent:event];
     
-    //    只需要改animateBlock中duration，即可改变popUpviews的移动速度
+    //只需要改animateBlock中duration，即可改变popUpviews的移动速度
     
     [self setValue:[self stepValueForCurrentValue] animated:NO];//duration depends on distance. does not send action
     [self.parasitic setValue:[self stepValueForCurrentValue] animated:YES];//AS的yes才会动画调整arrowOffset
-    //    [self.parasitic setSprintValue:[self stepValueForCurrentValue]];
     [self popTickIfNeededFromTouch:nil];
-    //    [IIDelayedAction delayedAction:^{
-    //        NSLog(@"执行");
-    //
-    //    } withDelay:1.];
-    //thumb停靠
-    //停靠后要pop
-    
 }
 
 - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event
