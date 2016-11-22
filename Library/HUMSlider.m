@@ -850,17 +850,19 @@ static CGFloat const HUMTickWidth = 1;
     
     NSLayoutConstraint *constraint = self.allTickBottomConstraints[index];
     constraint.constant = yOrigin;
-    
-    
-    [UIView animateWithDuration:duration
-                          delay:delay
-         usingSpringWithDamping:0.6f
-          initialSpringVelocity:0.0f
-                        options:UIViewAnimationOptionCurveLinear
-                     animations:^{
-                         [self layoutIfNeeded];
-                     }
-                     completion:nil];
+    //同步ASValueTrackingSlider
+    [UIView animateWithDuration:0.1 animations:^{
+        [self layoutIfNeeded];
+    }];
+//    [UIView animateWithDuration:duration
+//                          delay:delay
+//         usingSpringWithDamping:0.6f
+//          initialSpringVelocity:0.0f
+//                        options:UIViewAnimationOptionCurveLinear
+//                     animations:^{
+//                         [self layoutIfNeeded];
+//                     }
+//                     completion:nil];
 }
 
 #pragma mark - Calculation helpers
